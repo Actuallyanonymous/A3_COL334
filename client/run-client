@@ -1,0 +1,15 @@
+#!/bin/sh
+# Start the HTTP client from any working directory.
+#
+# The kernel still has its own TCP stack. A segment that arrives for a
+# port the kernel did not open makes it send a RST, and our stack is
+# required to abort when a RST arrives. Drop those RSTs for the source
+# ports this client is allowed to use (61000-65535).
+#
+# That range sits above Ubuntu's default ephemeral range (32768-60999),
+# so curl and wget on this machine still get normal kernel TCP.
+if command -v iptables >/dev/null 2>&1; then
+    iptables -C OUTPUT -p tcp --sport 61000:65535 --tcp-flags RST RST -j DROP 2>/dev/null \
+        || iptables -I OUTPUT 1 -p tcp --sport 61000:65535 --tcp-flags RST RST -j DROP
+fi
+exec python3 "$(dirname "$0")/../src/http_client.py" "$@"

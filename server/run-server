@@ -1,0 +1,26 @@
+#!/bin/sh
+# Start the HTTP server from any working directory.
+#
+# Drop kernel RSTs sourced from the listen port. Without this, the
+# kernel answers the client's SYN with RST before our program can
+# complete the handshake. The rule matches only this port, so a
+# python3 -m http.server on another port is unaffected.
+PORT=8080
+prev=
+for arg in "$@"; do
+    if [ "$prev" = "-p" ]; then
+        PORT=$arg
+    fi
+    case "$arg" in
+        -p?*)
+            PORT=${arg#-p}
+            ;;
+    esac
+    prev=$arg
+done
+
+if command -v iptables >/dev/null 2>&1; then
+    iptables -C OUTPUT -p tcp --sport "$PORT" --tcp-flags RST RST -j DROP 2>/dev/null \
+        || iptables -I OUTPUT 1 -p tcp --sport "$PORT" --tcp-flags RST RST -j DROP
+fi
+exec python3 "$(dirname "$0")/../src/http_server.py" "$@"
